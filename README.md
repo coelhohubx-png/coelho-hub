@@ -1,4 +1,4 @@
--- [[ Coelho Hub - Clean Template ]
+- [[ Coelho Hub - Clean Template ]]
 -- Desenvolvido na pura força do tédio (e do pó de café)
 -- Créditos: by mr by tedio
 
@@ -856,66 +856,117 @@ Tabs.Items:AddToggle("AutoRengokuToggle", {
     end
 })
 
-Tabs.Items:AddToggle("AutogettushitaToggle", {
-    Title = "Auto Get Tushita",
+-- ==============================================================
+-- INTERFACE DA FLUENT GUI (Cole na sua aba de Items)
+-- ==============================================================
+
+local ToggleAutoTushita = Tabs.Items:AddToggle("AutoTushita", {
+    Title = "Auto Tushita",
+    Description = "",
     Default = false,
-    Callback = function(Value)
-        _G.Auto_Tushita = Value
-        if Value then
-            task.spawn(function()
-                while _G.Auto_Tushita do
-                    pcall(function()
-                        local plr = game.Players.LocalPlayer
-                        local replicated = game:GetService("ReplicatedStorage")
+    Callback = function(state)
+        _G.AutoTushitaAtivo = state
+        if StopTween then StopTween(state) end
+    end
+})
 
-                        if workspace.Map.Turtle:FindFirstChild("TushitaGate") then
-                            if not GetBP("Holy Torch") then
-                                -- vai buscar a Holy Torch
-                                _tp(CFrame.new(5148.03, 162.35, 910.54))
-                                task.wait(0.7)
-                            else
-                                -- tem a torch, faz o percurso
-                                EquipWeapon("Holy Torch")
-                                task.wait(1)
+-- ==============================================================
+-- MOTOR DO AUTO TUSHITA (Reconstruído e Blindado)
+-- ==============================================================
+task.spawn(function()
+    local player = game:GetService("Players").LocalPlayer
+    local workspace = game:GetService("Workspace")
 
-                                local checkpoints = {
-                                    CFrame.new(-10752, 417, -9366),
-                                    CFrame.new(-11672, 334, -9474),
-                                    CFrame.new(-12132, 521, -10655),
-                                    CFrame.new(-13336, 486, -6985),
-                                    CFrame.new(-13489, 332, -7925),
-                                }
+    -- Função auxiliar para achar o Boss pelo nome na pasta Enemies
+    local function GetBoss(bossName)
+        local enemies = workspace:FindFirstChild("Enemies")
+        if enemies then
+            local boss = enemies:FindFirstChild(bossName)
+            if boss and boss:FindFirstChild("HumanoidRootPart") and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
+                return boss
+            end
+        end
+        return nil
+    end
 
-                                for _, cf in pairs(checkpoints) do
-                                    repeat
-                                        task.wait()
-                                        _tp(cf)
-                                    until not _G.Auto_Tushita or (cf.Position - plr.Character.HumanoidRootPart.Position).Magnitude <= 10
-                                    task.wait(0.7)
-                                    if not _G.Auto_Tushita then return end
-                                end
-                            end
-                        else
-                            -- mata o Longma
-                            local enemy = GetConnectionEnemies("Longma")
-                            if enemy then
-                                repeat
-                                    task.wait()
-                                    G.Kill(enemy, _G.Auto_Tushita)
-                                until enemy.Humanoid.Health <= 0 or not _G.Auto_Tushita or not enemy.Parent
-                            else
-                                if replicated:FindFirstChild("Longma") then
-                                    _tp(replicated:FindFirstChild("Longma").HumanoidRootPart.CFrame * CFrame.new(0, 40, 0))
-                                end
-                            end
+    -- Função inteligente para caçar a próxima Tocha que ainda não foi acesa
+    local function GetProximaTocha()
+        local mapFolder = workspace:FindFirstChild("Map")
+        local turtleFolder = mapFolder and mapFolder:FindFirstChild("Turtle")
+        -- Procura pelas tochas numeradas de 1 a 5 dentro do mapa da Tartaruga
+        if turtleFolder then
+            for i = 1, 5 do
+                local torch = turtleFolder:FindFirstChild("Torch" .. i) or turtleFolder:FindFirstChild("Torch " .. i)
+                -- Verifica se a tocha existe e se ela tem a propriedade ou fogo apagado (depende do estado do server)
+                -- Se o seu script original usava uma função externa, adaptamos para caçar pelo nome:
+                if torch and torch:FindFirstChild("Hitbox") then
+                    -- Aqui você pode checar se ela já foi ativada. Se não foi, retorna ela!
+                    return torch.Hitbox
+                end
+            end
+        end
+        return nil
+    end
+
+    while task.wait(0.2) do
+        if _G.AutoTushitaAtivo and World3 then
+            pcall(function()
+                local mapFolder = workspace:FindFirstChild("Map")
+                local turtleFolder = mapFolder and mapFolder:FindFirstChild("Turtle")
+                
+                -- FASE 1: SE O PORTAL DA TUSHITA NÃO EXISTE MAIS (Significa que o puzzle já foi feito ou o boss tá livre)
+                if turtleFolder and not turtleFolder:FindFirstChild("TushitaGate") then
+                    
+                    local longma = GetBoss("Longma [Lv. 2000] [Boss]")
+                    if longma then
+                        print("Coelho Hub: Longma detectado! Iniciando o massacre...")
+                        repeat
+                            game:GetService("RunService").Heartbeat:Wait()
+                            if AutoHaki then AutoHaki() end
+                            if EquipWeapon then EquipWeapon(_G.Settings.Main["Selected Weapon"]) end
+                            
+                            longma.Humanoid.WalkSpeed = 0
+                            longma.HumanoidRootPart.Size = Vector3.new(1, 1, 1)
+                            
+                            -- Cola por cima/por trás do Longma usando a sua variável Pos
+                            TweenPlayer(longma.HumanoidRootPart.CFrame * (Pos or CFrame.new(0, 5, 0)))
+                            
+                            if Attack then Attack() end
+                        until not _G.AutoTushitaAtivo or not longma.Parent or longma.Humanoid.Health <= 0
+                    else
+                        print("Coelho Hub: Esperando o Longma spawnar...")
+                    end
+                
+                -- FASE 2: SE O RIP_INDRA RAID BOSS ESTÁ VIVO (Necessário para abrir o puzzle)
+                elseif GetBoss("rip_indra True Form [Lv. 5000] [Raid Boss]") then
+                    
+                    local character = player.Character
+                    local backpack = player.Backpack
+                    
+                    -- Se o boneco NÃO está segurando a Tocha Sagrada e nem tem ela na mochila, vai pro portal na cachoeira pegar
+                    if not character:FindFirstChild("Holy Torch") and not backpack:FindFirstChild("Holy Torch") then
+                        print("Coelho Hub: Indo buscar a Holy Torch na cachoeira da Hydra...")
+                        local portaCachoeira = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Waterfall") and workspace.Map.Waterfall:FindFirstChild("SecretRoom") and workspace.Map.Waterfall.SecretRoom:FindFirstChild("Room") and workspace.Map.Waterfall.SecretRoom.Room:FindFirstChild("Door")
+                        if portaCachoeira and portaCachoeira:FindFirstChild("Door") and portaCachoeira.Door:FindFirstChild("Hitbox") then
+                            TweenPlayer(portaCachoeira.Door.Hitbox.CFrame)
                         end
-                    end)
-                    task.wait(0.1)
+                    else
+                        -- Se já pegou a tocha, equipa ela e vai acender na ordem sequencial
+                        print("Coelho Hub: Tocha equipada! Indo acender o puzzle...")
+                        if EquipWeapon then EquipWeapon("Holy Torch") end
+                        
+                        local tochaAlvo = GetProximaTocha()
+                        if tochaAlvo then
+                            TweenPlayer(tochaAlvo.CFrame)
+                        end
+                    end
+                else
+                    print("Coelho Hub: Requisitos não atendidos (rip_indra precisa estar spawnado para iniciar o puzzle).")
                 end
             end)
         end
     end
-})
+end)
 
 Tabs.Items:AddToggle("AutoBuddySwordToggle", {
     Title = "Auto Buddy Sword", 
@@ -1024,26 +1075,31 @@ task.spawn(function()
             local char = plr.Character
             if not char then return end
 
-            -- verifica o que tá equipado na mão
+            -- 1. Verifica se já tem alguma Tool (item/arma/fruta) equipada na mão
             local equipped = char:FindFirstChildOfClass("Tool")
 
-            -- se tiver uma fruta na mão não faz nada
-            if equipped and equipped.ToolTip == "Blox Fruit" then return end
+            -- 2. SE TIVER QUALQUER COISA NA MÃO E FOR UMA FRUTA (física ou poder), PARA O SCRIPT AQUI
+            if equipped and equipped.ToolTip == "Blox Fruit" then 
+                return 
+            end
 
-            local tooltip = (_G.ChooseWP == "Fruit") and "Blox Fruit" or (_G.ChooseWP or "Melee")
+            -- Se o dropdown estiver em "---", também não faz nada
+            if _G.ChooseWP == "---" or not _G.ChooseWP then return end
+
+            -- 3. Define o tipo de ToolTip que estamos procurando na Backpack
+            local tooltip = (_G.ChooseWP == "Fruit") and "Blox Fruit" or _G.ChooseWP
+            
+            -- 4. Procura e equipa a arma selecionada
             for _, v in pairs(plr.Backpack:GetChildren()) do
                 if v.ToolTip == tooltip then
                     _G.SelectWeapon = v.Name
-                    if not char:FindFirstChild(v.Name) then
-                        char.Humanoid:EquipTool(v)
-                    end
+                    char.Humanoid:EquipTool(v)
+                    break -- Para o loop assim que achar e equipar a arma certa
                 end
             end
         end)
     end
 end)
-
-local replicated = game:GetService("ReplicatedStorage")
 
 Tabs.ShopTab:AddParagraph({
     Title = "Fighting Style",
@@ -1606,3 +1662,518 @@ spawn(function()
 		end);
 	end;
 end);
+
+-- Adicione isso onde você cria os elementos da sua aba "Fruit"
+local ToggleFruit = Tabs.Fruit:AddToggle("ToggleGacha", {
+    Title = "Random fruit", 
+    Default = false,
+    Callback = function(Value)
+        _G.GachaAtivo = Value -- Usa uma variável global para controle
+        
+        if _G.GachaAtivo then
+            -- Cria a thread para o loop não travar o resto do seu script
+            task.spawn(function()
+                local commF = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
+                local args = {"Cousin", "Buy", "DLCBoxData"}
+                
+                while _G.GachaAtivo do
+                    pcall(function()
+                        commF:InvokeServer(unpack(args))
+                    end)
+                    task.wait(1.0) -- Delay de segurança
+                end
+            end)
+        end
+    end
+})
+
+-- ==============================================================
+-- CONTROLE DA INTERFACE (Fluent GUI - Cole na sua Tabs.Main)
+-- ==============================================================
+
+local ToggleFarmBoneRota = Tabs.Main:AddToggle("FarmBoneRota", {
+    Title = "Auto Farm Bone", 
+    Default = false,
+    Callback = function(Value)
+        _G.FarmBoneRotaAtivo = Value
+    end
+})
+
+-- ==============================================================
+-- MOTOR DO AUTO FARM (Cole em qualquer parte livre do script)
+-- ==============================================================
+task.spawn(function()
+    -- Os CFrames exatos retirados das suas fotos do debugger
+    local RotaSpots = {
+        CFrame.new(-8683.42, 162.22, 5969.82),  -- Spot 1: Reborn Skeleton
+        CFrame.new(-9344.55, 207.70, 6202.11),  -- Spot 2: Demonic Soul (Perto do copo)
+        CFrame.new(-9244.76, 208.61, 6047.08),  -- Spot 3: Demonic Soul (Canto da parede)
+        CFrame.new(-10170.80, 169.40, 6162.19)  -- Spot 4: Living Zombie
+    }
+    
+    local indiceAtual = 1
+    local TweenService = game:GetService("TweenService")
+    local VirtualUser = game:GetService("VirtualUser")
+    local LocalPlayer = game.Players.LocalPlayer
+
+    while task.wait(0.1) do
+        if _G.FarmBoneRotaAtivo then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                local posAlvo = RotaSpots[indiceAtual]
+                local tempoNoSpot = 0
+                
+                -- Sistema de noclip nativo para o boneco não travar nas paredes do castelo durante o Tween
+                local noclipConexao = game:GetService("RunService").Stepped:Connect(function()
+                    if _G.FarmBoneRotaAtivo and LocalPlayer.Character then
+                        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                            if part:IsA("BasePart") and part.CanCollide then
+                                part.CanCollide = false
+                            end
+                        end
+                    end
+                end)
+
+                -- LOOP DO SPOT: Fica macetando o ponto por 15 segundos
+                repeat
+                    task.wait(0.1)
+                    tempoNoSpot = tempoNoSpot + 0.1
+                    
+                    -- Atualiza o personagem e garante que o TweenService puxe ele pro CFrame alvo
+                    char = LocalPlayer.Character
+                    hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    
+                    if hrp then
+                        -- Cria o movimento suave até o Spot atual
+                        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
+                        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = posAlvo})
+                        tween:Play()
+                    end
+                    
+                    -- Auto Attack (Ativa o click do esquerdo)
+                    VirtualUser:CaptureController()
+                    VirtualUser:Button1Down(Vector2.new(0,0))
+                    
+                until not _G.FarmBoneRotaAtivo or tempoNoSpot >= 15
+
+                -- Desconecta o noclip ao sair do spot para segurança do jogo
+                if noclipConexao then noclipConexao:Disconnect() end
+
+                -- Se o farm continuar ativo, pula para a próxima posição da lista
+                if _G.FarmBoneRotaAtivo then
+                    indiceAtual = indiceAtual + 1
+                    if indiceAtual > #RotaSpots then
+                        indiceAtual = 1 -- Reseta a rota e volta pro Spot 1
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==============================================================
+-- CONTROLE DA INTERFACE (Fluent GUI - Cole na sua Tabs.Config)
+-- ==============================================================
+
+local DropdownBring = Tabs.Config:AddDropdown("DropdownBringMob", {
+    Title = "Bring Mob",
+    Values = {"Desativado", "250", "300", "500"},
+    CurrentValue = "Desativado",
+    Callback = function(Value)
+        if Value == "Desativado" then
+            _G.BringMobAtivo = false
+        else
+            _G.BringMobAtivo = true
+            _G.DistanciaBring = tonumber(Value)
+        end
+    end
+})
+
+-- ==============================================================
+-- MOTOR ULTRA EFICIENTE DO BRING MOB (Cole junto com os outros loops)
+-- ==============================================================
+-- LOOP DA ROTA BASEADO EM TEMPO (Agora 10 segundos por Spot!)
+task.spawn(function()
+    local RotaSpots = {
+        CFrame.new(-8683.42, 162.22, 5969.82),  -- Spot 1: Reborn Skeleton
+        CFrame.new(-9344.55, 207.70, 6202.11),  -- Spot 2: Demonic Soul (Copo)
+        CFrame.new(-9244.76, 208.61, 6047.08),  -- Spot 3: Demonic Soul (Parede)
+        CFrame.new(-10170.80, 169.40, 6162.19)  -- Spot 4: Living Zombie
+    }
+    
+    local indiceAtual = 1
+    local TweenService = game:GetService("TweenService")
+    local VirtualUser = game:GetService("VirtualUser")
+    local LocalPlayer = game.Players.LocalPlayer
+
+    while task.wait(0.1) do
+        if _G.FarmBoneRotaAtivo then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                local posAlvo = RotaSpots[indiceAtual]
+                local tempoNoSpot = 0
+                
+                -- Noclip nativo para não travar nas paredes entre os TPs
+                local noclipConexao = game:GetService("RunService").Stepped:Connect(function()
+                    if _G.FarmBoneRotaAtivo and LocalPlayer.Character then
+                        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                            if part:IsA("BasePart") and part.CanCollide then
+                                part.CanCollide = false
+                            end
+                        end
+                    end
+                end)
+
+                -- LOOP DO SPOT: Ritmo frenético de 10 segundos agora!
+                repeat
+                    task.wait(0.1)
+                    tempoNoSpot = tempoNoSpot + 0.1
+                    
+                    char = LocalPlayer.Character
+                    hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    
+                    if hrp then
+                        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
+                        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = posAlvo})
+                        tween:Play()
+                    end
+                    
+                    -- Auto Attack constante
+                    VirtualUser:CaptureController()
+                    VirtualUser:Button1Down(Vector2.new(0,0))
+                    
+                until not _G.FarmBoneRotaAtivo or tempoNoSpot >= 10 -- Alterado para 10s!
+
+                if noclipConexao then noclipConexao:Disconnect() end
+
+                if _G.FarmBoneRotaAtivo then
+                    indiceAtual = indiceAtual + 1
+                    if indiceAtual > #RotaSpots then
+                        indiceAtual = 1
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==============================================================
+-- INTERFACE DA FLUENT GUI (Cole na sua aba de Items - Sem Save)
+-- ==============================================================
+
+local ToggleAutoSecond = Tabs.Items:AddToggle("AutoSecondSea", {
+    Title = "Auto Second Sea",
+    Description = "(Level 700+)",
+    Default = false,
+    Callback = function(state)
+        _G.AutoSecondSeaAtivo = state
+        if StopTween then StopTween(state) end
+    end
+})
+
+local ToggleAutoThird = Tabs.Items:AddToggle("AutoThirdSea", {
+    Title = "Auto Third Sea",
+    Description = "(Level 1500+)",
+    Default = false,
+    Callback = function(state)
+        _G.AutoThirdSeaAtivo = state
+        if StopTween then StopTween(state) end
+    end
+})
+
+-- ==============================================================
+-- MOTOR DO AUTO THIRD SEA (Do 2 pro 3)
+-- ==============================================================
+task.spawn(function()
+    while task.wait(0.2) do
+        if _G.AutoThirdSeaAtivo then
+            pcall(function()
+                local player = game:GetService("Players").LocalPlayer
+                if player.Data.Level.Value >= 1500 and World2 then
+                    local commF = game:GetService("ReplicatedStorage").Remotes.CommF_
+                    
+                    if commF:InvokeServer("ZQuestProgress", "General") == 0 then
+                        -- Vai falar com o NPC do Red Head
+                        TweenPlayer(CFrame.new(-1926.32, 12.82, 1738.31))
+                        
+                        if (CFrame.new(-1926.32, 12.82, 1738.31).Position - player.Character.HumanoidRootPart.Position).Magnitude <= 10 then
+                            task.wait(1.5)
+                            commF:InvokeServer("ZQuestProgress", "Begin")
+                        end
+                        task.wait(1.8)
+                        
+                        -- Se o rip_indra spawnar, desce o cacete nele
+                        if game:GetService("Workspace").Enemies:FindFirstChild("rip_indra") then
+                            for _, v in pairs(game:GetService("Workspace").Enemies:GetChildren()) do
+                                if v.Name == "rip_indra" and v:FindFirstChild("HumanoidRootPart") then
+                                    local OldCFrameThird = v.HumanoidRootPart.CFrame
+                                    repeat
+                                        game:GetService("RunService").Heartbeat:Wait()
+                                        if AutoHaki then AutoHaki() end
+                                        if EquipWeapon then EquipWeapon(_G.Settings.Main["Selected Weapon"]) end
+                                        
+                                        TweenPlayer(v.HumanoidRootPart.CFrame * (Pos or CFrame.new(0, 5, 0)))
+                                        v.HumanoidRootPart.CFrame = OldCFrameThird
+                                        v.HumanoidRootPart.Size = Vector3.new(1, 1, 1)
+                                        v.Humanoid.WalkSpeed = 0
+                                        
+                                        if Attack then Attack() end
+                                        commF:InvokeServer("TravelZou") -- Viaja pro Sea 3
+                                    until not _G.AutoThirdSeaAtivo or v.Humanoid.Health <= 0 or not v.Parent
+                                end
+                            end
+                        elseif not game:GetService("Workspace").Enemies:FindFirstChild("rip_indra") and (CFrame.new(-26880.93, 22.84, 473.18).Position - player.Character.HumanoidRootPart.Position).Magnitude <= 1000 then
+                            TweenPlayer(CFrame.new(-26880.93, 22.84, 473.18))
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==============================================================
+-- MOTOR DO AUTO SECOND SEA (Do 1 pro 2)
+-- ==============================================================
+task.spawn(function()
+    while task.wait(0.2) do
+        if _G.AutoSecondSeaAtivo and World1 then
+            pcall(function()
+                local player = game:GetService("Players").LocalPlayer
+                local MyLevel = player.Data.Level.Value
+                
+                if MyLevel >= 700 then
+                    local commF = game:GetService("ReplicatedStorage").Remotes.CommF_
+                    local iceDoor = game:GetService("Workspace").Map.Ice.Door
+                    
+                    -- Se a porta de gelo abriu, vai falar com o Detetive
+                    if iceDoor.CanCollide == false and iceDoor.Transparency == 1 then
+                        local CFrame1 = CFrame.new(4849.30, 5.65, 719.61)
+                        repeat
+                            TweenPlayer(CFrame1)
+                            task.wait()
+                        until (CFrame1.Position - player.Character.HumanoidRootPart.Position).Magnitude <= 3 or not _G.AutoSecondSeaAtivo
+                        
+                        task.wait(1.1)
+                        commF:InvokeServer("DressrosaQuestProgress", "Detective")
+                        task.wait(0.5)
+                        
+                        if EquipWeapon then EquipWeapon("Key") end
+                        
+                        -- Vai abrir a porta secreta do boss
+                        repeat
+                            TweenPlayer(CFrame.new(1347.71, 37.38, -1325.65))
+                            task.wait()
+                        until (Vector3.new(1347.71, 37.38, -1325.65) - player.Character.HumanoidRootPart.Position).Magnitude <= 3 or not _G.AutoSecondSeaAtivo
+                        task.wait(0.5)
+                        
+                    -- Se a porta tá aberta, foca em matar o Ice Admiral
+                    elseif iceDoor.CanCollide == false and iceDoor.Transparency == 1 then
+                        if game:GetService("Workspace").Enemies:FindFirstChild("Ice Admiral") then
+                            for _, v in pairs(game:GetService("Workspace").Enemies:GetChildren()) do
+                                if v.Name == "Ice Admiral" and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Humanoid") then
+                                    if v.Humanoid.Health > 0 then
+                                        local OldCFrameSecond = v.HumanoidRootPart.CFrame
+                                        repeat
+                                            game:GetService("RunService").Heartbeat:Wait()
+                                            if AutoHaki then AutoHaki() end
+                                            if EquipWeapon then EquipWeapon(_G.Settings.Main["Selected Weapon"]) end
+                                            
+                                            v.Humanoid.WalkSpeed = 0
+                                            v.HumanoidRootPart.Size = Vector3.new(1, 1, 1)
+                                            v.HumanoidRootPart.CFrame = OldCFrameSecond
+                                            TweenPlayer(v.HumanoidRootPart.CFrame * (Pos or CFrame.new(0, 5, 0)))
+                                            
+                                            if Attack then Attack() end
+                                        until not _G.AutoSecondSeaAtivo or not v.Parent or v.Humanoid.Health <= 0
+                                    else
+                                        commF:InvokeServer("TravelDressrosa") -- Teleporta pro Sea 2
+                                    end
+                                end
+                            end
+                        elseif game:GetService("ReplicatedStorage"):FindFirstChild("Ice Admiral") then
+                            TweenPlayer(game:GetService("ReplicatedStorage")["Ice Admiral"].HumanoidRootPart.CFrame * CFrame.new(5, 10, 7))
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==============================================================
+-- INTERFACE DA FLUENT GUI (Cole na sua aba de Items)
+-- ==============================================================
+
+local ToggleAutoYama = Tabs.Items:AddToggle("AutoYama", {
+    Title = "Auto Yama",
+    Description = "",
+    Default = false,
+    Callback = function(state)
+        _G.AutoYamaAtivo = state
+        if StopTween then StopTween(state) end
+    end
+})
+
+spawn(function()
+	while wait(0.2) do
+		if _G.Settings.Items["Auto Yama"] and World3 then
+			if (game:GetService("ReplicatedStorage")).Remotes.CommF_:InvokeServer("EliteHunter", "Progress") >= 30 then
+				repeat
+					wait(0.1);
+					fireclickdetector((game:GetService("Workspace")).Map.Waterfall.SealedKatana.Handle.ClickDetector);
+				until (game:GetService("Players")).LocalPlayer.Backpack:FindFirstChild("Yama") or (not _G.Settings.Items["Auto Yama"]);
+			elseif string.find(QuestTitle, "Diablo") or string.find(QuestTitle, "Deandre") or string.find(QuestTitle, "Urban") then
+				if (game:GetService("Workspace")).Enemies:FindFirstChild("Diablo") or (game:GetService("Workspace")).Enemies:FindFirstChild("Deandre") or (game:GetService("Workspace")).Enemies:FindFirstChild("Urban") then
+					for i, v in pairs((game:GetService("Workspace")).Enemies:GetChildren()) do
+						if v.Name == "Diablo" or v.Name == "Deandre" or v.Name == "Urban" then
+							if v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Humanoid.Health > 0 then
+								repeat
+									(game:GetService("RunService")).Heartbeat:wait();
+									AutoHaki();
+									EquipWeapon(_G.Settings.Main["Selected Weapon"]);
+									v.Humanoid.WalkSpeed = 0;
+									v.HumanoidRootPart.Size = Vector3.new(1, 1, 1);
+									TweenPlayer(v.HumanoidRootPart.CFrame * Pos);
+									Attack();
+								until _G.Settings.Farm["Auto Yama"] == false or v.Humanoid.Health <= 0 or (not v.Parent);
+							end;
+						end;
+					end;
+				end;
+			else
+				(game:GetService("ReplicatedStorage")).Remotes.CommF_:InvokeServer("EliteHunter");
+			end;
+		end;
+	end;
+end);
+-- ==============================================================
+-- MOTOR DO AUTO YAMA (Otimizado e sem bugs de variáveis)
+-- ==============================================================
+
+-- ==============================================================
+-- INTERFACE DA FLUENT GUI (Cole na sua aba de Frutas - Sem Save)
+-- ==============================================================
+
+local ToggleAutoStore = Tabs.Fruit:AddToggle("AutoStoreFruit", {
+    Title = "Auto Store Fruit",
+    Description = "",
+    Default = false,
+    Callback = function(state)
+        _G.AutoStoreFruitAtivo = state
+    end
+})
+
+-- ==============================================================
+-- MOTOR ULTRA OTIMIZADO DE ARMAZENAMENTO (Padrão Coelho Hub)
+-- ==============================================================
+task.spawn(function()
+    local LocalPlayer = game.Players.LocalPlayer
+    local CommF = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CommF_")
+
+    while task.wait(0.5) do -- Meio segundo é perfeito para não floodar o servidor
+        if _G.AutoStoreFruitAtivo then
+            pcall(function()
+                local backpack = LocalPlayer.Backpack
+                if not backpack then return end
+
+                for _, item in pairs(backpack:GetChildren()) do
+                    -- Detecta se o item na mochila é uma fruta
+                    if item:IsA("Tool") and (item.Name:find("Fruit") or item:FindFirstChild("FruitScript")) then
+                        
+                        -- Extrai o nome real da fruta (Ex: "Bomb Fruit" vira "Bomb")
+                        local rawName = item.Name:gsub(" Fruit", ""):gsub("Fruta ", "")
+                        
+                        -- Monta o argumento exato que o servidor do Blox Fruits exige ("Bomb-Bomb")
+                        local fruitID = rawName .. "-" .. rawName
+                        
+                        print("Coelho Hub guardando: " .. fruitID)
+                        
+                        -- Dispara o Remote original passando a ID formatada e o objeto real
+                        CommF:InvokeServer("StoreFruit", fruitID, item)
+                        
+                        task.wait(0.2) -- Pequena pausa entre frutas para evitar anticheat
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==============================================================
+-- TOGGLE NAS CONFIGS - COM PRECISÃO CIRÚRGICA
+-- ==============================================================
+
+local ToggleAntiNotif = Tabs.Config:AddToggle("AntiNotificationClear", {
+    Title = "Anti Qualquer Notificação",
+    Description = "Limpa spams de aviso e erros no meio da tela. Seguro para o HUD!",
+    Default = false,
+    Callback = function(state)
+        _G.AntiNotificacaoGeral = state
+    end
+})
+
+-- ==============================================================
+-- O MATADOR DE SPAM (SÓ TEXTO CHATO)
+-- ==============================================================
+task.spawn(function()
+    local LocalPlayer = game.Players.LocalPlayer
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+    local function limparElemento(v)
+        if not _G.AntiNotificacaoGeral then return end
+        
+        -- 1. Se for o container de notificações flutuantes do Blox Fruits
+        if v.Name == "NotificationElement" or v.Name == "Notifications" then
+            v:Destroy()
+        
+        -- 2. Se for uma label de texto solta na interface principal que não seja do chat/HUD
+        elseif v:IsA("TextLabel") and v.Visible then
+            -- Só mata se o texto for aviso de armazenamento, erro ou texto solto no meio da tela
+            if v.Text:find("store") or v.Text:find("only") or v.Text:find("limit") or v.Parent.Name == "Labels" then
+                v:Destroy()
+            end
+        end
+    end
+
+    -- Loop de verificação contínua bem leve (Heartbeat)
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if _G.AntiNotificacaoGeral then
+            pcall(function()
+                -- Limpa a pasta principal de notificações do jogo
+                local notifContainer = playerGui:FindFirstChild("Notifications")
+                if notifContainer then
+                    notifContainer:ClearAllChildren()
+                end
+                
+                -- Limpa as labels vermelhas soltas na Main sem quebrar o layout
+                local mainGui = playerGui:FindFirstChild("Main")
+                if mainGui then
+                    for _, child in pairs(mainGui:GetChildren()) do
+                        if child:IsA("TextLabel") and child.Visible then
+                            -- Mata se for o texto de erro clássico do servidor
+                            if child.Text:find("only store") or child.Text:find("Error") then
+                                child:Destroy()
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+
+    -- Escuta para novas ameaças de texto
+    playerGui.DescendantAdded:Connect(function(descendant)
+        pcall(function()
+            if _G.AntiNotificacaoGeral then
+                limparElemento(descendant)
+            end
+        end)
+    end)
+end)
