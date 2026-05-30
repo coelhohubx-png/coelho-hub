@@ -1,4 +1,4 @@
--- [[ Coelho Hub - Clean Template ]
+-- [[ Coelho Hub - Clean Template ]]
 -- Desenvolvido na pura força do tédio (e do pó de café)
 -- Créditos: by mr by tedio
 
@@ -1350,183 +1350,6 @@ local ToggleFruit = Tabs.Fruit:AddToggle("ToggleGacha", {
     end
 })
 
--- ==============================================================
--- CONTROLE DA INTERFACE (Fluent GUI - Cole na sua Tabs.Main)
--- ==============================================================
-
-local ToggleFarmBoneRota = Tabs.Main:AddToggle("FarmBoneRota", {
-    Title = "Auto Farm Bone", 
-    Default = false,
-    Callback = function(Value)
-        _G.FarmBoneRotaAtivo = Value
-    end
-})
-
--- ==============================================================
--- MOTOR DO AUTO FARM (Cole em qualquer parte livre do script)
--- ==============================================================
-task.spawn(function()
-    -- Os CFrames exatos retirados das suas fotos do debugger
-    local RotaSpots = {
-        CFrame.new(-8683.42, 162.22, 5969.82),  -- Spot 1: Reborn Skeleton
-        CFrame.new(-9344.55, 207.70, 6202.11),  -- Spot 2: Demonic Soul (Perto do copo)
-        CFrame.new(-9244.76, 208.61, 6047.08),  -- Spot 3: Demonic Soul (Canto da parede)
-        CFrame.new(-10170.80, 169.40, 6162.19)  -- Spot 4: Living Zombie
-    }
-    
-    local indiceAtual = 1
-    local TweenService = game:GetService("TweenService")
-    local VirtualUser = game:GetService("VirtualUser")
-    local LocalPlayer = game.Players.LocalPlayer
-
-    while task.wait(0.1) do
-        if _G.FarmBoneRotaAtivo then
-            pcall(function()
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if not hrp then return end
-
-                local posAlvo = RotaSpots[indiceAtual]
-                local tempoNoSpot = 0
-                
-                -- Sistema de noclip nativo para o boneco não travar nas paredes do castelo durante o Tween
-                local noclipConexao = game:GetService("RunService").Stepped:Connect(function()
-                    if _G.FarmBoneRotaAtivo and LocalPlayer.Character then
-                        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-                            if part:IsA("BasePart") and part.CanCollide then
-                                part.CanCollide = false
-                            end
-                        end
-                    end
-                end)
-
-                -- LOOP DO SPOT: Fica macetando o ponto por 15 segundos
-                repeat
-                    task.wait(0.1)
-                    tempoNoSpot = tempoNoSpot + 0.1
-                    
-                    -- Atualiza o personagem e garante que o TweenService puxe ele pro CFrame alvo
-                    char = LocalPlayer.Character
-                    hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    
-                    if hrp then
-                        -- Cria o movimento suave até o Spot atual
-                        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
-                        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = posAlvo})
-                        tween:Play()
-                    end
-                    
-                    -- Auto Attack (Ativa o click do esquerdo)
-                    VirtualUser:CaptureController()
-                    VirtualUser:Button1Down(Vector2.new(0,0))
-                    
-                until not _G.FarmBoneRotaAtivo or tempoNoSpot >= 15
-
-                -- Desconecta o noclip ao sair do spot para segurança do jogo
-                if noclipConexao then noclipConexao:Disconnect() end
-
-                -- Se o farm continuar ativo, pula para a próxima posição da lista
-                if _G.FarmBoneRotaAtivo then
-                    indiceAtual = indiceAtual + 1
-                    if indiceAtual > #RotaSpots then
-                        indiceAtual = 1 -- Reseta a rota e volta pro Spot 1
-                    end
-                end
-            end)
-        end
-    end
-end)
-
--- ==============================================================
--- CONTROLE DA INTERFACE (Fluent GUI - Cole na sua Tabs.Config)
--- ==============================================================
-
-local DropdownBring = Tabs.Config:AddDropdown("DropdownBringMob", {
-    Title = "Bring Mob",
-    Values = {"Desativado", "250", "300", "500"},
-    CurrentValue = "Desativado",
-    Callback = function(Value)
-        if Value == "Desativado" then
-            _G.BringMobAtivo = false
-        else
-            _G.BringMobAtivo = true
-            _G.DistanciaBring = tonumber(Value)
-        end
-    end
-})
-
--- ==============================================================
--- MOTOR ULTRA EFICIENTE DO BRING MOB (Cole junto com os outros loops)
--- ==============================================================
--- LOOP DA ROTA BASEADO EM TEMPO (Agora 10 segundos por Spot!)
-task.spawn(function()
-    local RotaSpots = {
-        CFrame.new(-8683.42, 162.22, 5969.82),  -- Spot 1: Reborn Skeleton
-        CFrame.new(-9344.55, 207.70, 6202.11),  -- Spot 2: Demonic Soul (Copo)
-        CFrame.new(-9244.76, 208.61, 6047.08),  -- Spot 3: Demonic Soul (Parede)
-        CFrame.new(-10170.80, 169.40, 6162.19)  -- Spot 4: Living Zombie
-    }
-    
-    local indiceAtual = 1
-    local TweenService = game:GetService("TweenService")
-    local VirtualUser = game:GetService("VirtualUser")
-    local LocalPlayer = game.Players.LocalPlayer
-
-    while task.wait(0.1) do
-        if _G.FarmBoneRotaAtivo then
-            pcall(function()
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if not hrp then return end
-
-                local posAlvo = RotaSpots[indiceAtual]
-                local tempoNoSpot = 0
-                
-                -- Noclip nativo para não travar nas paredes entre os TPs
-                local noclipConexao = game:GetService("RunService").Stepped:Connect(function()
-                    if _G.FarmBoneRotaAtivo and LocalPlayer.Character then
-                        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-                            if part:IsA("BasePart") and part.CanCollide then
-                                part.CanCollide = false
-                            end
-                        end
-                    end
-                end)
-
-                -- LOOP DO SPOT: Ritmo frenético de 10 segundos agora!
-                repeat
-                    task.wait(0.1)
-                    tempoNoSpot = tempoNoSpot + 0.1
-                    
-                    char = LocalPlayer.Character
-                    hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    
-                    if hrp then
-                        local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear)
-                        local tween = TweenService:Create(hrp, tweenInfo, {CFrame = posAlvo})
-                        tween:Play()
-                    end
-                    
-                    -- Auto Attack constante
-                    VirtualUser:CaptureController()
-                    VirtualUser:Button1Down(Vector2.new(0,0))
-                    
-                until not _G.FarmBoneRotaAtivo or tempoNoSpot >= 10 -- Alterado para 10s!
-
-                if noclipConexao then noclipConexao:Disconnect() end
-
-                if _G.FarmBoneRotaAtivo then
-                    indiceAtual = indiceAtual + 1
-                    if indiceAtual > #RotaSpots then
-                        indiceAtual = 1
-                    end
-                end
-            end)
-        end
-    end
-end)
-
-
 local ToggleAutoStore = Tabs.Fruit:AddToggle("AutoStoreFruit", {
     Title = "Auto Store Fruit",
     Description = "",
@@ -1642,4 +1465,252 @@ task.spawn(function()
             end
         end)
     end)
+end)
+
+-- ==============================================================
+-- SLIDER DE VELOCIDADE DO FARM NA ABA CONFIG
+-- ==============================================================
+_G.VelocidadeFarmBone = 350 -- Valor padrão inicial (equilibrado e seguro)
+
+Tabs.Config:AddSlider("SliderVelocidadeBone", {
+    Title = "Velocidade",
+    Description = "Ajusta a velocidade do Tween entre os spots",
+    Min = 100,
+    Max = 500,
+    Default = 350,
+    Rounding = 0,
+    Callback = function(Value)
+        _G.VelocidadeFarmBone = Value
+    end
+})
+
+-- ==============================================================
+-- TOGGLE DO AUTO FARM CHEST (COLE NA SUA ABA MAIN)
+-- ==============================================================
+local ToggleAutoChest = Tabs.Main:AddToggle("AutoFarmChestToggle", {
+    Title = "Auto Farm Chest",
+    Description = "",
+    Default = false,
+    Callback = function(Value)
+        _G.AutoFarmChest = Value -- Ativa/Desativa o motor sênior de cima
+        
+        -- Segurança: Se o jogador desligar o botão, limpa o Tween imediatamente para o boneco não continuar voando sozinho
+        if not Value then
+            if StopTween then 
+                StopTween(false) 
+            else
+                -- Fallback caso o seu StopTween tenha outro nome, força uma parada na física do HRP
+                local char = game.Players.LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local TweenService = game:GetService("TweenService")
+                    TweenService:Create(hrp, TweenInfo.new(0.1), {CFrame = hrp.CFrame}):Play()
+                end
+            end
+            print("Coelho Hub: Farm de baús desativado com segurança.")
+        end
+    end
+})
+
+-- ==============================================================
+-- TOGGLE + MOTOR DO AUTO ACTIVE RACE (V3/V4)
+-- ==============================================================
+
+-- 1. O Botão para a sua Tab Main
+local ToggleRaceAbility = Tabs.Config:AddToggle("AutoRaceAbilityToggle", {
+    Title = "Auto Activate v3",
+    Description = "",
+    Default = false,
+    Callback = function(Value)
+        _G.RaceClickAutov3 = Value
+    end
+})
+
+-- 2. O Motor que roda em segundo plano (Sem travar o clique)
+task.spawn(function()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    -- Busca o remote CommE de forma segura
+    local CommE = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommE")
+    
+    local tempoEsperaMaximo = 30 -- Tempo de Cooldown da habilidade
+    local tempoPassado = 0
+
+    while task.wait(0.2) do
+        if _G.RaceClickAutov3 then
+            pcall(function()
+                -- Dispara o remote oficial do jogo para ativar a raça
+                CommE:FireServer("ActivateAbility")
+                
+                -- LOOP DE ESPERA INTELIGENTE:
+                -- Em vez de dar um wait(30) seco, ele checa a cada 1 segundo se você desligou o botão
+                tempoPassado = 0
+                repeat
+                    task.wait(1)
+                    tempoPassado = tempoPassado + 1
+                until not _G.RaceClickAutov3 or tempoPassado >= tempoEsperaMaximo
+            end)
+        end
+    end
+end)
+
+-- ==============================================================
+-- BOTÃO DE RESGATAR TODOS OS CÓDIGOS (ABA CONFIG / MISC)
+-- ==============================================================
+Tabs.ShopTab:AddButton({
+    Title = "Redeem All Codes",
+    Callback = function()
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        
+        -- Lista de códigos atualizada e limpa de duplicatas inúteis
+        local Codes = {
+            "REWARDMAN", "NEWTROLL", "KITT_RESET", "Sub2CaptainMaui", "DEVSCOOKING",
+            "SUB2GAMERROBOT_RESET1", "sub2gamerrobot_exp1", "Sub2OfficialNoobie",
+            "THEGREATACE", "SUB2NOOBMASTER123", "SUB2DAIGROCK", "AXIORE",
+            "TANTAIGAMING", "STRAWHATMAINE", "BLUXXY", "FUDD10", "FUDD10_V2",
+            "BIGNREWS", "SUB2UNCLEKIZARU", "ENYU_IS_PRO", "MAGICBUS", "JCWK",
+            "STARCODEHEO", "KITTGAMING", "CHANDLER"
+        }
+        
+        -- Caminho oficial e atualizado do Remote de códigos do Blox Fruits
+        local CommF = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
+        
+        if not CommF then
+            -- Fallback de aviso caso a biblioteca de notificação não esteja indexada como 'bearlib'
+            print("Coelho Hub: Erro - Sistema de Remotes não encontrado.")
+            return
+        end
+        
+        print("Coelho Hub: Iniciando resgate automatizado de códigos...")
+        
+        for _, code in ipairs(Codes) do
+            pcall(function()
+                -- O Blox Fruits usa InvokeServer no CommF_ passando o argumento "RedeemCode"
+                CommF:InvokeServer("RedeemCode", code)
+            end)
+            -- Delay de proteção de 0.5 segundos por código para o servidor processar sem dar lag ou kick
+            task.wait(0.5) 
+        end
+        
+        print("Coelho Hub: Todos os códigos disponíveis foram processados!")
+        
+        -- Se sua biblioteca de UI for do estilo Rayfield/Orion, você pode descomentar a linha abaixo para mandar um aviso visual:
+        -- game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Coelho Hub", Text = "Todos os códigos foram processados!", Duration = 5})
+    end
+})
+
+
+-- ==============================================================
+-- CIRCUITO COMPLETO E TRAVADO DO CASTELO (BOTÃO + MOTOR)
+-- ==============================================================
+
+-- 1. O GATILHO PARA A SUA INTERFACE (COLE NA SUA ABA MAIN)
+local ToggleCircuito = Tabs.Main:AddToggle("AutoCircuitoCasteloToggle", {
+    Title = "farm bones",
+    Description = "Patrulha o castelo inteiro flutuando 6 studs acima dos monstros",
+    Default = false,
+    Callback = function(Value)
+        _G.ExecutarCircuito = Value
+        
+        -- Se desligar, para o Tween na hora para o boneco não ficar voando sozinho
+        if not Value then
+            local char = game.Players.LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                game:GetService("TweenService"):Create(hrp, TweenInfo.new(0.1), {CFrame = hrp.CFrame}):Play()
+            end
+            print("Coelho Hub: Circuito desativado.")
+        else
+            print("Coelho Hub: Circuito ativo. Iniciando patrulha...")
+        end
+    end
+})
+
+-- 2. O MOTOR COMPLETO COM LOOP DE REPETIÇÃO E TRAVA DE ALTURA
+task.spawn(function()
+    local Players = game:GetService("Players")
+    local TweenService = game:GetService("TweenService")
+    local VirtualUser = game:GetService("VirtualUser")
+    local RunService = game:GetService("RunService")
+    
+    local plr = Players.LocalPlayer
+    local indiceAtual = 1
+
+    -- Todos os seus 7 CFrames unificados
+    local CircuitoCompleto = {
+        CFrame.new(-8682.10, 140.95, 5968.93, -0.998627424, 0, 0.0523794815, 0, 1, 0, -0.0523794815, 0, -0.998627424),
+        CFrame.new(-8646.10, 140.95, 5850.93, 0.0523988605, 0, 0.998626292, 0, 1, 0, -0.998626292, 0, 0.0523988605),
+        CFrame.new(-8710.10, 140.95, 6112.93, 0.998627245, -0, -0.0523794815, 0, 1, -0, 0.0523794815, 0, 0.998627245),
+        CFrame.new(-8826.10, 140.95, 6165.93, 0.998627245, -0, -0.0523794815, 0, 1, -0, 0.0523794815, 0, 0.998627245),
+        CFrame.new(-10061.90, 140.17, 6038.62, 0.970287263, -0, -0.241955817, 0, 1, -0, 0.241955817, 0, 0.970287263),
+        CFrame.new(-10293.10, 152.95, 5960.93, 0.0348494053, -0, -0.999392569, 0, 1, -0, 0.999392569, 0, 0.0348494053),
+        CFrame.new(-10170.90, 141.17, 6159.62, 0.970287263, -0, -0.241955817, 0, 1, -0, 0.241955817, 0, 0.970287263)
+    }
+
+    -- Noclip Seguro de uma única conexão para evitar lag de memória
+    RunService.Stepped:Connect(function()
+        if _G.ExecutarCircuito and plr.Character then
+            for _, part in pairs(plr.Character:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+
+    while task.wait(0.1) do
+        if _G.ExecutarCircuito then
+            pcall(function()
+                local char = plr.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                -- Pega o spot atual e joga 6 studs para cima
+                local spotOriginal = CircuitoCompleto[indiceAtual]
+                local posAlvoFlutuando = spotOriginal * CFrame.new(0, 6, 0)
+                
+                -- 1. TELEPORTE INICIAL SUAVE ATÉ O SPOT (Anti-Kick pelo Slider)
+                local distancia = (hrp.Position - posAlvoFlutuando.Position).Magnitude
+                local velocidadeReal = _G.VelocidadeFarmBone or 350
+                local tempoVoo = distancia / velocidadeReal
+                if tempoVoo < 0.1 then tempoVoo = 0.1 end
+
+                local tween = TweenService:Create(hrp, TweenInfo.new(tempoVoo, Enum.EasingStyle.Linear), {CFrame = posAlvoFlutuando})
+                tween:Play()
+                tween.Completed:Wait() -- Espera chegar certinho na altura antes de abrir o cronômetro
+
+                -- 2. O LOOP DE TROCA DE POSIÇÃO (Fica batendo e travado no alto por 4 segundos)
+                local tempoNoSpot = 0
+                repeat
+                    task.wait(0.1)
+                    tempoNoSpot = tempoNoSpot + 0.1
+                    
+                    char = plr.Character
+                    hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    
+                    if hrp then
+                        -- REPETIÇÃO: Força o CFrame a ficar cravado 6 studs acima do chão a cada 100ms
+                        TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = posAlvoFlutuando}):Play()
+                    end
+                    
+                    -- Equipamento automático da arma selecionada no seu Hub
+                    if EquipWeapon and _G.SelectWeapon then
+                        EquipWeapon(_G.SelectWeapon)
+                    end
+
+                    -- Auto Clique constante para estraçalhar os bichos embaixo
+                    VirtualUser:CaptureController()
+                    VirtualUser:Button1Down(Vector2.new(0,0))
+
+                until not _G.ExecutarCircuito or tempoNoSpot >= 4 -- Acabou os 4 segundos? Sai do loop
+
+                -- 3. Atualiza o índice para avançar de posição no próximo ciclo
+                if _G.ExecutarCircuito then
+                    indiceAtual = indiceAtual + 1
+                    if indiceAtual > #CircuitoCompleto then
+                        indiceAtual = 1 -- Reinicia a patrulha voltando pro Spot 1
+                    end
+                end
+            end)
+        end
+    end
 end)
