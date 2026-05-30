@@ -1494,21 +1494,30 @@ local ToggleAutoChest = Tabs.Main:AddToggle("AutoFarmChestToggle", {
     Callback = function(Value)
         _G.AutoFarmChest = Value -- Ativa/Desativa o motor sênior de cima
         
-        -- Segurança: Se o jogador desligar o botão, limpa o Tween imediatamente para o boneco não continuar voando sozinho
-        if not Value then
-            if StopTween then 
-                StopTween(false) 
-            else
-                -- Fallback caso o seu StopTween tenha outro nome, força uma parada na física do HRP
-                local char = game.Players.LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local TweenService = game:GetService("TweenService")
-                    TweenService:Create(hrp, TweenInfo.new(0.1), {CFrame = hrp.CFrame}):Play()
-                end
-            end
-            print("Coelho Hub: Farm de baús desativado com segurança.")
+local function pegarBausProximos()
+    local CollectionService = game:GetService("CollectionService")
+    local char = game.Players.LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return {} end
+
+    local Chests = CollectionService:GetTagged("_ChestTagged")
+    local count = 0
+
+    for _, chest in pairs(Chests) do
+        if chest and chest.Parent and not chest:GetAttribute("IsDisabled") then
+            count = count + 1
         end
+    end
+
+    return count
+end
+
+Tabs.Config:AddButton("BotaoAtualizarChest", {
+    Title = "Verificar Baús no Servidor",
+    Description = "Conta quantos baús estão ativos no momento",
+    Callback = function()
+        local total = pegarBausProximos()
+        print("Coelho Hub: " .. total .. " baú(s) ativo(s) no servidor.")
     end
 })
 
@@ -1598,117 +1607,76 @@ Tabs.ShopTab:AddButton({
     end
 })
 
-
 -- ==============================================================
--- CIRCUITO COMPLETO E TRAVADO DO CASTELO (BOTÃO + MOTOR)
+-- AUTO PEGAR MISSÃO ELITE HUNTER (BOTÃO + MOTOR)
 -- ==============================================================
 
--- 1. O GATILHO PARA A SUA INTERFACE (COLE NA SUA ABA MAIN)
-local ToggleCircuito = Tabs.Main:AddToggle("AutoCircuitoCasteloToggle", {
-    Title = "farm bones",
-    Description = "Patrulha o castelo inteiro flutuando 6 studs acima dos monstros",
+_G.AutoEliteHunter = false
+
+-- 1. INTERFACE (COLE NA SUA ABA MAIN)
+Tabs.Main:AddToggle("ToggleEliteHunter", {
+    Title = "Auto Pegar Missão Elite",
+    Description = "Viaja até o NPC, pega a missão de Elite e ativa o clique",
     Default = false,
     Callback = function(Value)
-        _G.ExecutarCircuito = Value
-        
-        -- Se desligar, para o Tween na hora para o boneco não ficar voando sozinho
+        _G.AutoEliteHunter = Value
         if not Value then
+            -- Para o boneco se o botão for desligado
             local char = game.Players.LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             if hrp then
                 game:GetService("TweenService"):Create(hrp, TweenInfo.new(0.1), {CFrame = hrp.CFrame}):Play()
             end
-            print("Coelho Hub: Circuito desativado.")
+            print("Coelho Hub: Auto Elite Hunter desativado.")
         else
-            print("Coelho Hub: Circuito ativo. Iniciando patrulha...")
+            print("Coelho Hub: Auto Elite Hunter ativado!")
         end
     end
 })
 
--- 2. O MOTOR COMPLETO COM LOOP DE REPETIÇÃO E TRAVA DE ALTURA
+-- 2. MOTOR DE TELEPORTE, DIÁLOGO VIA REMOTE E ATAQUE
 task.spawn(function()
     local Players = game:GetService("Players")
     local TweenService = game:GetService("TweenService")
     local VirtualUser = game:GetService("VirtualUser")
-    local RunService = game:GetService("RunService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
     
     local plr = Players.LocalPlayer
-    local indiceAtual = 1
-
-    -- Todos os seus 7 CFrames unificados
-    local CircuitoCompleto = {
-        CFrame.new(-8682.10, 140.95, 5968.93, -0.998627424, 0, 0.0523794815, 0, 1, 0, -0.0523794815, 0, -0.998627424),
-        CFrame.new(-8646.10, 140.95, 5850.93, 0.0523988605, 0, 0.998626292, 0, 1, 0, -0.998626292, 0, 0.0523988605),
-        CFrame.new(-8710.10, 140.95, 6112.93, 0.998627245, -0, -0.0523794815, 0, 1, -0, 0.0523794815, 0, 0.998627245),
-        CFrame.new(-8826.10, 140.95, 6165.93, 0.998627245, -0, -0.0523794815, 0, 1, -0, 0.0523794815, 0, 0.998627245),
-        CFrame.new(-10061.90, 140.17, 6038.62, 0.970287263, -0, -0.241955817, 0, 1, -0, 0.241955817, 0, 0.970287263),
-        CFrame.new(-10293.10, 152.95, 5960.93, 0.0348494053, -0, -0.999392569, 0, 1, -0, 0.999392569, 0, 0.0348494053),
-        CFrame.new(-10170.90, 141.17, 6159.62, 0.970287263, -0, -0.241955817, 0, 1, -0, 0.241955817, 0, 0.970287263)
-    }
-
-    -- Noclip Seguro de uma única conexão para evitar lag de memória
-    RunService.Stepped:Connect(function()
-        if _G.ExecutarCircuito and plr.Character then
-            for _, part in pairs(plr.Character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end)
+    -- A coordenada que você mandou (ajustada com 5 studs de altura padrão de farm)
+    local PosiçãoNPC = CFrame.new(-5417.66, 313.06, -2822.91) * CFrame.new(0, 5, 0)
 
     while task.wait(0.1) do
-        if _G.ExecutarCircuito then
+        if _G.AutoEliteHunter then
             pcall(function()
                 local char = plr.Character
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 if not hrp then return end
 
-                -- Pega o spot atual e joga 6 studs para cima
-                local spotOriginal = CircuitoCompleto[indiceAtual]
-                local posAlvoFlutuando = spotOriginal * CFrame.new(0, 6, 0)
-                
-                -- 1. TELEPORTE INICIAL SUAVE ATÉ O SPOT (Anti-Kick pelo Slider)
-                local distancia = (hrp.Position - posAlvoFlutuando.Position).Magnitude
-                local velocidadeReal = _G.VelocidadeFarmBone or 350
-                local tempoVoo = distancia / velocidadeReal
-                if tempoVoo < 0.1 then tempoVoo = 0.1 end
+                -- 1. CHECA DISTÂNCIA PARA SABER SE JÁ CHEGOU NO NPC
+                local distancia = (hrp.Position - PosiçãoNPC.Position).Magnitude
 
-                local tween = TweenService:Create(hrp, TweenInfo.new(tempoVoo, Enum.EasingStyle.Linear), {CFrame = posAlvoFlutuando})
-                tween:Play()
-                tween.Completed:Wait() -- Espera chegar certinho na altura antes de abrir o cronômetro
+                if distancia > 15 then
+                    -- Se estiver longe, viaja até lá usando a velocidade do seu Slider
+                    local velocidadeReal = _G.VelocidadeFarmBone or 350
+                    local tempoVoo = distancia / velocidadeReal
+                    if tempoVoo < 0.1 then tempoVoo = 0.1 end
 
-                -- 2. O LOOP DE TROCA DE POSIÇÃO (Fica batendo e travado no alto por 4 segundos)
-                local tempoNoSpot = 0
-                repeat
-                    task.wait(0.1)
-                    tempoNoSpot = tempoNoSpot + 0.1
+                    local tween = TweenService:Create(hrp, TweenInfo.new(tempoVoo, Enum.EasingStyle.Linear), {CFrame = PosiçãoNPC})
+                    tween:Play()
+                    tween.Completed:Wait() -- Espera o pouso
+                else
+                    -- 2. SE JÁ CHEGOU PERTO (- de 15 studs): ENVIAR OS INVOKES
+                    local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("CommF_")
                     
-                    char = plr.Character
-                    hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    -- Dispara o diálogo do EliteHunter que você passou
+                    remote:InvokeServer("EliteHunter")
                     
-                    if hrp then
-                        -- REPETIÇÃO: Força o CFrame a ficar cravado 6 studs acima do chão a cada 100ms
-                        TweenService:Create(hrp, TweenInfo.new(0.1, Enum.EasingStyle.Linear), {CFrame = posAlvoFlutuando}):Play()
-                    end
-                    
-                    -- Equipamento automático da arma selecionada no seu Hub
-                    if EquipWeapon and _G.SelectWeapon then
-                        EquipWeapon(_G.SelectWeapon)
-                    end
+                    task.wait(0.5) -- Pausa rápida para o jogo processar a conversa
 
-                    -- Auto Clique constante para estraçalhar os bichos embaixo
+                    -- 3. INTERRUPTOR DE CLIQUE (SEU CLICK DETECTOR ATIVO)
+                    -- Senta o dedo no Auto Attack constante após pegar a missão
                     VirtualUser:CaptureController()
                     VirtualUser:Button1Down(Vector2.new(0,0))
-
-                until not _G.ExecutarCircuito or tempoNoSpot >= 4 -- Acabou os 4 segundos? Sai do loop
-
-                -- 3. Atualiza o índice para avançar de posição no próximo ciclo
-                if _G.ExecutarCircuito then
-                    indiceAtual = indiceAtual + 1
-                    if indiceAtual > #CircuitoCompleto then
-                        indiceAtual = 1 -- Reinicia a patrulha voltando pro Spot 1
-                    end
                 end
             end)
         end
